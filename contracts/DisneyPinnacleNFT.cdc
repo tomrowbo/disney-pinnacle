@@ -197,9 +197,7 @@ access(all) contract DisneyPinnacleNFT: NonFungibleToken {
             let token <- token as! @DisneyPinnacleNFT.NFT
             let id = token.id
             let oldToken <- self.ownedNFTs[id] <- token
-            if oldToken != nil {
-                destroy oldToken
-            }
+            destroy oldToken
         }
 
         /// forEachID iterates through the IDs of the collection

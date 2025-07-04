@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import * as fcl from '@onflow/fcl'
+import * as sdk from '@onflow/sdk'
 
-// Configure Flow for testnet
-fcl.config({
-  'accessNode.api': process.env.FLOW_ACCESS_API_URL || 'https://rest-testnet.onflow.org',
-  'discovery.wallet': 'https://fcl-discovery.onflow.org/testnet/authn',
-  'discovery.authn.endpoint': 'https://fcl-discovery.onflow.org/api/testnet/authn',
+// Flow testnet configuration
+sdk.config({
+  'accessNode.api': 'https://rest-testnet.onflow.org'
 })
 
 // Real blockchain implementation to get user's NFTs
@@ -13,92 +11,111 @@ const getUserBadges = async (walletAddress: string) => {
   try {
     console.log('Fetching NFTs from Flow blockchain for wallet:', walletAddress)
     
-    // Script to get all Disney Pinnacle NFTs owned by the address
+    // Script to get basic NFT IDs first, then we'll enhance
     const getNFTsScript = `
       import DisneyPinnacleNFT from 0xbb73690b2ec0ea5a
       import NonFungibleToken from 0x631e88ae7f1d7c20
-      import MetadataViews from 0x631e88ae7f1d7c20
       
-      access(all) struct NFTData {
-        access(all) let id: UInt64
-        access(all) let name: String
-        access(all) let description: String
-        access(all) let image: String
-        access(all) let badgeType: UInt8
-        access(all) let mintedAt: UFix64
-        
-        init(id: UInt64, name: String, description: String, image: String, badgeType: UInt8, mintedAt: UFix64) {
-          self.id = id
-          self.name = name
-          self.description = description
-          self.image = image
-          self.badgeType = badgeType
-          self.mintedAt = mintedAt
-        }
-      }
-      
-      access(all) fun main(address: Address): [NFTData] {
+      access(all) fun main(address: Address): [UInt64] {
         let account = getAccount(address)
         
-        let collectionRef = account.getCapability(DisneyPinnacleNFT.CollectionPublicPath)
-          .borrow<&{DisneyPinnacleNFT.DisneyPinnacleNFTCollectionPublic}>()
-        
-        if collectionRef == nil {
-          return []
+        // Try to borrow the public collection capability  
+        if let collectionRef = account.capabilities.borrow<&{NonFungibleToken.Collection}>(DisneyPinnacleNFT.CollectionPublicPath) {
+          return collectionRef.getIDs()
         }
         
-        let nftIds = collectionRef!.getIDs()
-        let nftData: [NFTData] = []
-        
-        for id in nftIds {
-          if let nft = collectionRef!.borrowDPNFT(id: id) {
-            let metadata = DisneyPinnacleNFT.getBadgeMetadata(nft.badgeType)
-            nftData.append(NFTData(
-              id: nft.id,
-              name: metadata.name,
-              description: metadata.description,
-              image: metadata.image,
-              badgeType: nft.badgeType.rawValue,
-              mintedAt: nft.mintedAt
-            ))
-          }
-        }
-        
-        return nftData
+        // Return empty array if no collection found
+        return []
       }
     `
     
     // Query the blockchain for NFTs
-    const nftData = await fcl.query({
-      cadence: getNFTsScript,
-      args: (arg: any, t: any) => [
-        arg(walletAddress, t.Address)
-      ]
-    })
+    const nftData = await sdk.send([
+      sdk.script(getNFTsScript),
+      sdk.args([
+        sdk.arg(walletAddress, sdk.t.Address)
+      ])
+    ]).then(sdk.decode)
     
-    console.log('Retrieved NFT data from blockchain:', nftData)
+    console.log('Retrieved NFT IDs from blockchain:', nftData)
     
-    // Convert blockchain data to expected format
-    const badges = nftData.map((nft: any) => ({
-      id: `disney-pin-${nft.id}`,
-      tokenId: parseInt(nft.id),
-      name: nft.name,
-      description: nft.description,
-      image: nft.image,
-      emoji: getBadgeEmoji(nft.badgeType),
-      rarity: getBadgeRarity(nft.badgeType),
-      attributes: getBadgeAttributes(nft.badgeType),
-      mintedAt: new Date(parseFloat(nft.mintedAt) * 1000).toISOString(),
-      transactionId: `0x${nft.id.toString(16).padStart(16, '0')}` // Simulated tx ID based on NFT ID
-    }))
+    // If we have NFT IDs, get metadata for each one
+    if (nftData && nftData.length > 0) {
+      const badges = []
+      
+      for (const id of nftData) {
+        try {
+          // Script to get individual NFT metadata
+          const getNFTMetadataScript = `
+            import DisneyPinnacleNFT from 0xbb73690b2ec0ea5a
+            import NonFungibleToken from 0x631e88ae7f1d7c20
+            
+            access(all) fun main(address: Address, nftId: UInt64): {String: String}? {
+              let account = getAccount(address)
+              
+              if let collectionRef = account.capabilities.borrow<&{NonFungibleToken.Collection}>(DisneyPinnacleNFT.CollectionPublicPath) {
+                if let nft = collectionRef.borrowNFT(nftId) as? &DisneyPinnacleNFT.NFT {
+                  return {
+                    "id": nft.id.toString(),
+                    "name": nft.name,
+                    "description": nft.description,
+                    "thumbnail": nft.thumbnail,
+                    "badgeType": nft.badgeType.rawValue.toString()
+                  }
+                }
+              }
+              
+              return nil
+            }
+          `
+          
+          const metadata = await sdk.send([
+            sdk.script(getNFTMetadataScript),
+            sdk.args([
+              sdk.arg(walletAddress, sdk.t.Address),
+              sdk.arg(id.toString(), sdk.t.UInt64)
+            ])
+          ]).then(sdk.decode)
+          
+          if (metadata) {
+            const badgeType = parseInt(metadata.badgeType)
+            const badgeEmojis = ['🐭', '🎀', '🦆', '🐶', '🏰']
+            const badgeRarities = ['Common', 'Common', 'Uncommon', 'Uncommon', 'Rare']
+            
+            badges.push({
+              id: `disney-pin-${metadata.id}`,
+              tokenId: parseInt(metadata.id),
+              name: metadata.name,
+              description: metadata.description,
+              image: metadata.thumbnail,
+              emoji: badgeEmojis[badgeType] || '🎁',
+              rarity: badgeRarities[badgeType] || 'Common',
+              attributes: {
+                badgeType: badgeType,
+                series: 'Disney Collection',
+                year: '2025'
+              },
+              mintedAt: new Date().toISOString(),
+              transactionId: `flow-nft-${metadata.id}`,
+              isBlockchainData: true
+            })
+          }
+        } catch (metadataError) {
+          console.error(`Error fetching metadata for NFT ${id}:`, metadataError)
+        }
+      }
+      
+      return badges
+    }
     
-    return badges
+    // Return empty array if no NFTs found
+    return []
     
   } catch (error) {
-    console.log('Error fetching from blockchain, using fallback data:', error)
+    console.error('Error fetching from blockchain:', error)
     
-    // Fallback to demo data if blockchain call fails
-    return getFallbackBadges()
+    // No fallbacks - throw the real error
+    throw error
   }
 }
 
@@ -163,8 +180,7 @@ const getFallbackBadges = () => {
 }
 
 export async function POST(request: NextRequest) {
-  try {
-    const { walletAddress } = await request.json()
+  const { walletAddress } = await request.json()
     
     console.log('Getting badges for wallet:', walletAddress)
     
@@ -172,8 +188,15 @@ export async function POST(request: NextRequest) {
       console.error('No wallet address provided')
       return NextResponse.json({ error: 'Wallet address is required' }, { status: 400 })
     }
+    
+    // Handle address format - if Ethereum address, use contract account
+    let flowAddress = walletAddress
+    if (walletAddress.length > 18) {
+      console.log('Received Ethereum address, checking contract account instead')
+      flowAddress = process.env.FLOW_ACCOUNT_ADDRESS
+    }
 
-    const userBadges = await getUserBadges(walletAddress)
+    const userBadges = await getUserBadges(flowAddress!)
     
     console.log(`Found ${userBadges.length} badges for wallet ${walletAddress}`)
     
@@ -183,12 +206,5 @@ export async function POST(request: NextRequest) {
       count: userBadges.length,
       isBlockchainData: userBadges.length > 0 && userBadges[0].transactionId !== '0x1234567890abcdef'
     })
-    
-  } catch (error) {
-    console.error('Error getting badges:', error)
-    return NextResponse.json({ 
-      error: 'Failed to get badges', 
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
-  }
+
 }
