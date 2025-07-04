@@ -13,6 +13,9 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@onflow/fcl": "^1.19.0",
+    "@onflow/flow-js-testing": "^0.6.0",
+    "@onflow/types": "^1.4.1",
     "@privy-io/react-auth": "^2.17.3",
     "@types/node": "^24.0.10",
     "@types/react": "^18.3.23",

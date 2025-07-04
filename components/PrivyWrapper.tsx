@@ -2,22 +2,17 @@
 
 import { PrivyProvider } from '@privy-io/react-auth'
 import ClientOnly from './ClientOnly'
-import { useRouter } from 'next/navigation'
+import AuthRedirect from './AuthRedirect'
 
 export default function PrivyWrapper({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const router = useRouter()
-
   return (
     <ClientOnly>
       <PrivyProvider
         appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID!}
-        onSuccess={() => {
-          router.push('/profile')
-        }}
         config={{
           loginMethods: ['email', 'google'],
           appearance: {
@@ -30,6 +25,7 @@ export default function PrivyWrapper({
           },
         }}
       >
+        <AuthRedirect />
         {children}
       </PrivyProvider>
     </ClientOnly>

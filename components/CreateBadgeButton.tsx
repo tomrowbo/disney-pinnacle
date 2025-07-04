@@ -1,0 +1,182 @@
+'use client'
+
+import { useState } from 'react'
+import { usePrivy } from '@privy-io/react-auth'
+
+interface Badge {
+  id: number
+  name: string
+  description: string
+  image: string
+  emoji?: string
+  rarity: string
+  attributes: any
+}
+
+interface BadgeResponse {
+  success: boolean
+  transactionId: string
+  badge: Badge
+  metadata: any
+  message: string
+  isSimulated?: boolean
+  blockchainStatus?: string
+  explorerUrl?: string
+}
+
+interface CreateBadgeButtonProps {
+  onBadgeCreated?: () => void
+}
+
+export default function CreateBadgeButton({ onBadgeCreated }: CreateBadgeButtonProps) {
+  const [isLoading, setIsLoading] = useState(false)
+  const [lastBadge, setLastBadge] = useState<Badge | null>(null)
+  const [lastResponse, setLastResponse] = useState<BadgeResponse | null>(null)
+  const { user } = usePrivy()
+
+  const createBadge = async () => {
+    setIsLoading(true)
+    
+    try {
+      // Get wallet address from Privy user
+      const walletAddress = user?.wallet?.address
+      
+      if (!walletAddress) {
+        alert('No wallet found. Please connect a wallet first.')
+        return
+      }
+
+      const response = await fetch('/api/create-badge', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          walletAddress
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to create badge')
+      }
+
+      const data: BadgeResponse = await response.json()
+      console.log('Badge creation response:', data)
+      
+      setLastBadge(data.badge)
+      setLastResponse(data)
+      
+      // Notify parent component to refresh badges
+      if (onBadgeCreated) {
+        onBadgeCreated()
+      }
+      
+    } catch (error) {
+      console.error('Error creating badge:', error)
+      alert('Failed to create badge. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const getRarityColor = (rarity: string) => {
+    switch (rarity.toLowerCase()) {
+      case 'common':
+        return 'text-gray-400 bg-gray-600'
+      case 'uncommon':
+        return 'text-green-400 bg-green-600'
+      case 'rare':
+        return 'text-purple-400 bg-purple-600'
+      case 'epic':
+        return 'text-blue-400 bg-blue-600'
+      case 'legendary':
+        return 'text-yellow-400 bg-yellow-600'
+      default:
+        return 'text-gray-400 bg-gray-600'
+    }
+  }
+
+  return (
+    <div className="text-center space-y-4">
+      <button
+        onClick={createBadge}
+        disabled={isLoading}
+        className="disney-button disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {isLoading ? (
+          <div className="flex items-center justify-center space-x-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            <span>Minting Badge...</span>
+          </div>
+        ) : (
+          'Create Random Badge'
+        )}
+      </button>
+      
+      {lastBadge && (
+        <div className="disney-card max-w-sm mx-auto mt-6">
+          <div className="text-center">
+            <h3 className="text-lg font-bold text-white mb-2">Latest Badge Minted!</h3>
+            <div className="mb-4">
+              <img 
+                src={lastBadge.image} 
+                alt={lastBadge.name}
+                className="w-16 h-16 mx-auto rounded-lg object-cover border-2 border-gray-500"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement
+                  target.style.display = 'none'
+                  const emojiDiv = target.nextElementSibling as HTMLElement
+                  if (emojiDiv) emojiDiv.style.display = 'block'
+                }}
+              />
+              <div className="text-6xl hidden">{lastBadge.emoji || lastBadge.image}</div>
+            </div>
+            <h4 className="text-xl font-semibold text-white mb-2">{lastBadge.name}</h4>
+            <p className="text-gray-400 text-sm mb-3">{lastBadge.description}</p>
+            
+            <span className={`text-xs px-3 py-1 rounded-full inline-block mb-3 ${getRarityColor(lastBadge.rarity)}`}>
+              {lastBadge.rarity}
+            </span>
+            
+            {lastResponse && (
+              <div className="text-xs text-gray-500 mt-3 space-y-2">
+                <div className="flex items-center justify-center space-x-2">
+                  <span className={`px-2 py-1 rounded-full text-xs ${
+                    lastResponse.isSimulated 
+                      ? 'bg-yellow-600 text-yellow-100' 
+                      : 'bg-green-600 text-green-100'
+                  }`}>
+                    {lastResponse.blockchainStatus || 'Status Unknown'}
+                  </span>
+                </div>
+                
+                <div className="break-all">
+                  <p>Transaction ID:</p>
+                  <p className="font-mono">{lastResponse.transactionId}</p>
+                </div>
+                
+                {lastResponse.explorerUrl && !lastResponse.isSimulated && (
+                  <div className="pt-2">
+                    <a 
+                      href={lastResponse.explorerUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-400 hover:text-blue-300 underline text-xs"
+                    >
+                      View on Flow Explorer →
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      
+      <p className="text-xs text-gray-500 max-w-md mx-auto">
+        Each badge is randomly selected using Flow blockchain's onchain randomness. 
+        Collect all 5 Disney pin badges!
+      </p>
+    </div>
+  )
+}
