@@ -2,22 +2,45 @@
 
 import Navbar from '@/components/Navbar'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { usePrivy } from '@privy-io/react-auth'
 
 export default function Profile() {
   const router = useRouter()
-  const [user] = useState({
-    name: 'Mickey Mouse',
-    email: 'mickey@disney.com',
-    profilePic: '🐭',
+  const { ready, authenticated, user: privyUser, logout } = usePrivy()
+  const [userStats] = useState({
     pinsCollected: 42,
-    tradingScore: 98,
-    joinDate: 'December 2024'
+    joinDate: 'July 2025'
   })
   
+  const getUsername = (email: string) => {
+    const username = email.split('@')[0]
+    return `@${username}`
+  }
+  
+  useEffect(() => {
+    if (ready && !authenticated) {
+      router.push('/signup')
+    }
+  }, [ready, authenticated, router])
+  
   const handleSignOut = () => {
+    logout()
     router.push('/')
+  }
+  
+  if (!ready || !authenticated) {
+    return (
+      <>
+        <Navbar />
+        <main className="min-h-screen flex items-center justify-center">
+          <div className="disney-card">
+            <p className="text-white">Loading...</p>
+          </div>
+        </main>
+      </>
+    )
   }
   
   const myPins = [
@@ -36,22 +59,25 @@ export default function Profile() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="disney-card mb-8">
             <div className="flex flex-col md:flex-row items-center md:items-start space-y-4 md:space-y-0 md:space-x-6">
-              <div className="text-8xl">{user.profilePic}</div>
+              <img 
+                src="/avatar-default.avif" 
+                alt="Profile Avatar" 
+                className="w-24 h-24 rounded-full object-cover border-2 border-disney-light-blue"
+              />
               <div className="flex-1 text-center md:text-left">
-                <h1 className="text-3xl font-bold disney-title mb-2">{user.name}</h1>
-                <p className="text-gray-400 mb-4">{user.email}</p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <h1 className="text-3xl font-bold disney-title mb-2">
+                  {privyUser?.email?.address ? getUsername(privyUser.email.address) : 
+                   privyUser?.google?.name || '@disney-fan'}
+                </h1>
+                <p className="text-gray-400 mb-4">{privyUser?.email?.address || 'Connected via Privy'}</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                   <div>
                     <p className="text-sm text-gray-400">Pins Collected</p>
-                    <p className="text-2xl font-bold text-disney-light-blue">{user.pinsCollected}</p>
+                    <p className="text-2xl font-bold text-disney-light-blue">{userStats.pinsCollected}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Trading Score</p>
-                    <p className="text-2xl font-bold text-disney-purple">{user.tradingScore}%</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Member Since</p>
-                    <p className="text-lg font-semibold">{user.joinDate}</p>
+                    <p className="text-sm text-gray-400">Member Since</p>
+                    <p className="text-lg font-semibold">{userStats.joinDate}</p>
                   </div>
                 </div>
                 <button onClick={handleSignOut} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-full transition-colors">

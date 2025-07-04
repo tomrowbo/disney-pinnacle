@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import PrivyWrapper from '@/components/PrivyWrapper'
 
 export const metadata: Metadata = {
   title: 'Disney Pinnacle',
@@ -13,7 +14,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="font-disney">{children}</body>
+      <body className="font-disney" suppressHydrationWarning={true}>
+        <PrivyWrapper>
+          {children}
+        </PrivyWrapper>
+      </body>
     </html>
   )
 }
