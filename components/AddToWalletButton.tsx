@@ -67,20 +67,7 @@ export default function AddToWalletButton() {
           'Add Pass to Wallet'
         )}
       </button>
-      
-      {passUrl && (
-        <p className="text-sm text-gray-400 mt-2">
-          Pass ready!{' '}
-          <a 
-            href={passUrl} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-disney-light-blue hover:text-disney-purple underline"
-          >
-            Click here to download
-          </a>
-        </p>
-      )}
+
     </div>
   )
 }
