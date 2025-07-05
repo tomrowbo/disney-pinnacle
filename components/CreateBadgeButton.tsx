@@ -334,11 +334,6 @@ export default function CreateBadgeButton({ onBadgeCreated }: CreateBadgeButtonP
           Each badge is randomly selected using Flow blockchain's onchain randomness. 
           Collect all 5 Disney pin badges!
         </p>
-        {user?.addr && (
-          <div className="bg-blue-600 text-blue-100 px-3 py-2 rounded-lg text-center">
-            🔗 Connected to Flow wallet: {user.addr}
-          </div>
-        )}
       </div>
     </div>
   )

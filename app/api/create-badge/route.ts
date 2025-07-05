@@ -127,23 +127,25 @@ const verifyKey = () => {
   return publicKey
 }
 
-// Authorization using simple account pattern
-const authz = (account: any = {}) => {
+// Authorization using the account resolver pattern - ORIGINAL WORKING VERSION
+const authz: any = async (account: any = {}) => {
+  const user = await sdk.account(ACCOUNT_ADDRESS)
+  const key = user.keys[KEY_INDEX]
+  
+  // Verify key matches
+  verifyKey()
+  
   return {
     ...account,
-    kind: 'ACCOUNT',
-    tempId: `${ACCOUNT_ADDRESS}-${KEY_INDEX}`,
     addr: ACCOUNT_ADDRESS,
     keyId: KEY_INDEX,
-    sequenceNum: 0, // Will be resolved automatically
+    sequenceNum: key.sequenceNumber,
     signature: null,
     signingFunction: (signable: any) => ({
       addr: ACCOUNT_ADDRESS,
       keyId: KEY_INDEX,
       signature: signWithKey(PRIVATE_KEY, signable.message)
-    }),
-    resolve: null,
-    roles: { proposer: true, authorizer: true, payer: true }
+    })
   }
 }
 
@@ -271,16 +273,15 @@ export async function POST(request: NextRequest) {
         }
       `
       
-      // Execute transaction using SDK
+      // Execute transaction using SDK - pass authz function directly
       const args = mintToUser ? [sdk.arg(walletAddress, sdk.t.Address)] : []
-      const authorization = authz()
       
       transactionId = await sdk.send([
         sdk.transaction(mintTransaction),
         sdk.args(args),
-        sdk.proposer(authorization),
-        sdk.authorizations([authorization]),
-        sdk.payer(authorization),
+        sdk.proposer(authz),
+        sdk.authorizations([authz]),
+        sdk.payer(authz),
         sdk.limit(1000)
       ]).then(sdk.decode)
       
