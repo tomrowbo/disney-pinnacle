@@ -55,6 +55,11 @@ export default function CreateBadgeButton({ onBadgeCreated }: CreateBadgeButtonP
       }
       
       console.log('Setting up collection for Flow address:', user.addr)
+      console.log('Raw user object:', user)
+      
+      // Ensure address has 0x prefix
+      const walletAddress = user.addr.startsWith('0x') ? user.addr : `0x${user.addr}`
+      console.log('Formatted wallet address:', walletAddress)
       
       // Collection setup transaction for Flow wallet
       const setupTransaction = `
@@ -92,9 +97,9 @@ export default function CreateBadgeButton({ onBadgeCreated }: CreateBadgeButtonP
       // Use FCL to send transaction - user signs with their Flow wallet
       const transactionId = await fcl.mutate({
         cadence: setupTransaction,
-        proposer: fcl.currentUser,
-        payer: fcl.currentUser,
-        authorizations: [fcl.currentUser],
+        proposer: fcl.currentUser.authorization,
+        payer: fcl.currentUser.authorization,
+        authorizations: [fcl.currentUser.authorization],
         limit: 1000
       })
       
@@ -136,14 +141,16 @@ export default function CreateBadgeButton({ onBadgeCreated }: CreateBadgeButtonP
     
     try {
       // Get wallet address from Flow user
-      const walletAddress = user?.addr
+      const rawAddress = user?.addr
       
-      if (!walletAddress) {
+      if (!rawAddress) {
         // If no wallet connected, trigger Flow wallet connection
         await fcl.authenticate()
         return
       }
 
+      // Ensure address has 0x prefix
+      const walletAddress = rawAddress.startsWith('0x') ? rawAddress : `0x${rawAddress}`
       console.log('Using Flow wallet address:', walletAddress)
       
       // Use Flow native minting
