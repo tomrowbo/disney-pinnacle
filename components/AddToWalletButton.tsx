@@ -1,22 +1,28 @@
 'use client'
 
-import { useState } from 'react'
-import { usePrivy } from '@privy-io/react-auth'
+import { useState, useEffect } from 'react'
+import * as fcl from '@onflow/fcl'
 
 export default function AddToWalletButton() {
   const [isLoading, setIsLoading] = useState(false)
   const [passUrl, setPassUrl] = useState<string | null>(null)
-  const { user } = usePrivy()
+  const [user, setUser] = useState<any>(null)
+  
+  useEffect(() => {
+    // Subscribe to Flow authentication state
+    const unsubscribe = fcl.currentUser.subscribe(setUser)
+    return () => unsubscribe()
+  }, [])
 
   const createPass = async () => {
     setIsLoading(true)
     
     try {
-      // Get wallet address from Privy user
-      const walletAddress = user?.wallet?.address
+      // Get wallet address from Flow user
+      const walletAddress = user?.addr
       
       if (!walletAddress) {
-        alert('No wallet found. Please connect a wallet first.')
+        alert('No wallet found. Please connect your Flow wallet first.')
         return
       }
 
@@ -27,7 +33,7 @@ export default function AddToWalletButton() {
         },
         body: JSON.stringify({
           walletAddress,
-          userEmail: user?.email?.address
+          userEmail: `${walletAddress.slice(0, 6)}@flow.wallet`
         }),
       })
 
@@ -61,7 +67,7 @@ export default function AddToWalletButton() {
         {isLoading ? (
           <div className="flex items-center justify-center space-x-2">
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-            <span>Creating Pass...</span>
+            <span>Creating Pass... </span>
           </div>
         ) : (
           'Add Pass to Wallet'
