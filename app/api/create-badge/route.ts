@@ -127,25 +127,23 @@ const verifyKey = () => {
   return publicKey
 }
 
-// Authorization using the account resolver pattern
-const authz = async (account: any = {}) => {
-  const user = await sdk.account(ACCOUNT_ADDRESS)
-  const key = user.keys[KEY_INDEX]
-  
-  // Verify key matches
-  verifyKey()
-  
+// Authorization using simple account pattern
+const authz = (account: any = {}) => {
   return {
     ...account,
+    kind: 'ACCOUNT',
+    tempId: `${ACCOUNT_ADDRESS}-${KEY_INDEX}`,
     addr: ACCOUNT_ADDRESS,
     keyId: KEY_INDEX,
-    sequenceNum: key.sequence_number,
+    sequenceNum: 0, // Will be resolved automatically
     signature: null,
     signingFunction: (signable: any) => ({
       addr: ACCOUNT_ADDRESS,
       keyId: KEY_INDEX,
       signature: signWithKey(PRIVATE_KEY, signable.message)
-    })
+    }),
+    resolve: null,
+    roles: { proposer: true, authorizer: true, payer: true }
   }
 }
 
@@ -275,13 +273,14 @@ export async function POST(request: NextRequest) {
       
       // Execute transaction using SDK
       const args = mintToUser ? [sdk.arg(walletAddress, sdk.t.Address)] : []
+      const authorization = authz()
       
       transactionId = await sdk.send([
         sdk.transaction(mintTransaction),
         sdk.args(args),
-        sdk.proposer(authz),
-        sdk.authorizations([authz]),
-        sdk.payer(authz),
+        sdk.proposer(authorization),
+        sdk.authorizations([authorization]),
+        sdk.payer(authorization),
         sdk.limit(1000)
       ]).then(sdk.decode)
       

@@ -24,7 +24,7 @@ export default function Navbar() {
   const getFlowBalance = async (address: string) => {
     try {
       const account = await fcl.account(address)
-      const balance = parseFloat(account.balance) / 100000000 // Convert from smallest unit
+      const balance = parseFloat(String(account.balance)) / 100000000 // Convert from smallest unit
       setFlowBalance(balance)
     } catch (error) {
       console.error('Error fetching Flow balance:', error)

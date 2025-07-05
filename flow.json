@@ -91,10 +91,6 @@
 		"testnet": "access.devnet.nodes.onflow.org:9000"
 	},
 	"accounts": {
-		"emulator-account": {
-			"address": "f8d6e0586b0a20c7",
-			"key": "2eae2f31cb5b756e6e595e32b74e7b9c6a0ab54d77e8138b3c6b16bb82c36b45"
-		},
 		"testnet": {
 			"address": "bb73690b2ec0ea5a",
 			"key": {

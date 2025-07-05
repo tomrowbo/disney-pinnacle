@@ -16,12 +16,15 @@ interface Badge {
 interface BadgeResponse {
   success: boolean
   transactionId: string
-  badge: Badge
+  badge?: Badge
   metadata: any
   message: string
   isSimulated?: boolean
   blockchainStatus?: string
   explorerUrl?: string
+  requiresCollectionSetup?: boolean
+  userAddress?: string
+  note?: string
 }
 
 interface CreateBadgeButtonProps {
