@@ -67,7 +67,7 @@ export default function AddToWalletButton() {
         {isLoading ? (
           <div className="flex items-center justify-center space-x-2">
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-            <span>Creating Pass...</span>
+            <span>Creating Pass... </span>
           </div>
         ) : (
           'Add Pass to Wallet'
