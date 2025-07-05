@@ -1,19 +1,25 @@
 'use client'
 
 import Navbar from '@/components/Navbar'
-import { usePrivy } from '@privy-io/react-auth'
+import * as fcl from '@onflow/fcl'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 export default function SignUp() {
   const router = useRouter()
-  const { ready, authenticated, login } = usePrivy()
+  const [user, setUser] = useState<any>(null)
   
   useEffect(() => {
-    if (authenticated) {
+    // Subscribe to Flow authentication state
+    const unsubscribe = fcl.currentUser.subscribe(setUser)
+    return () => unsubscribe()
+  }, [])
+  
+  useEffect(() => {
+    if (user?.addr) {
       router.push('/profile')
     }
-  }, [authenticated, router])
+  }, [user, router])
   
   return (
     <>
@@ -31,19 +37,18 @@ export default function SignUp() {
           
           <div className="mt-8 space-y-6">
             <button
-              onClick={login}
-              disabled={!ready}
-              className="disney-button w-full text-center disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => fcl.authenticate()}
+              className="disney-button w-full text-center"
             >
-              {ready ? 'Sign In with Privy' : 'Loading...'}
+              Connect Flow Wallet
             </button>
             
             <div className="text-center">
               <p className="text-sm text-gray-400">
-                Secure authentication powered by Privy
+                Secure authentication powered by Flow
               </p>
               <p className="text-xs text-gray-500 mt-2">
-                Supports email, Google, and wallet connections
+                Connect your Flow wallet to start collecting Disney NFTs
               </p>
             </div>
           </div>

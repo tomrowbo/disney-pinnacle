@@ -105,9 +105,9 @@
 	},
 	"deployments": {
 		"testnet": {
-			"testnet": [
-				"DisneyPinnacleNFT"
-			]
+			"testnet": {
+				"DisneyPinnacleNFT": "0xbb73690b2ec0ea5a"
+			}
 		}
 	}
 }

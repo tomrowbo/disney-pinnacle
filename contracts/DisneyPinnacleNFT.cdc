@@ -235,12 +235,11 @@ access(all) contract DisneyPinnacleNFT: NonFungibleToken {
         }
     }
 
-    /// getRandomBadgeType returns a random badge type using onchain data
+    /// getRandomBadgeType returns a random badge type using Flow's native randomness
     access(all) fun getRandomBadgeType(): BadgeType {
-        let blockHeight = getCurrentBlock().height
-        let timestamp = UInt64(getCurrentBlock().timestamp)
-        let randomSeed = blockHeight + timestamp
-        let badgeIndex = randomSeed % 5
+        // Use Flow's native revertibleRandom() for secure on-chain randomness
+        let randomValue = revertibleRandom<UInt64>()
+        let badgeIndex = randomValue % 5
         
         switch badgeIndex {
             case 0: return BadgeType.mickey

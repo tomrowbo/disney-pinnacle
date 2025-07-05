@@ -189,14 +189,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Wallet address is required' }, { status: 400 })
     }
     
-    // Handle address format - if Ethereum address, use contract account
-    let flowAddress = walletAddress
-    if (walletAddress.length > 18) {
-      console.log('Received Ethereum address, checking contract account instead')
-      flowAddress = process.env.FLOW_ACCOUNT_ADDRESS
+    // Validate Flow address format
+    if (!walletAddress.startsWith('0x') || walletAddress.length !== 18) {
+      return NextResponse.json({ 
+        error: 'Invalid address format - must be Flow address (0x + 16 hex chars)',
+        badges: [],
+        count: 0
+      }, { status: 400 })
     }
 
-    const userBadges = await getUserBadges(flowAddress!)
+    const userBadges = await getUserBadges(walletAddress)
     
     console.log(`Found ${userBadges.length} badges for wallet ${walletAddress}`)
     

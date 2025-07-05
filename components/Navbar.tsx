@@ -1,12 +1,38 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
-import { usePrivy } from '@privy-io/react-auth'
+import { useState, useEffect } from 'react'
+import * as fcl from '@onflow/fcl'
 
 export default function Navbar() {
-  const [dapperBalance] = useState(0.00)
-  const { ready, authenticated, user, login, logout } = usePrivy()
+  const [flowBalance, setFlowBalance] = useState(0.00)
+  const [user, setUser] = useState<any>(null)
+  
+  useEffect(() => {
+    // Subscribe to Flow authentication state
+    const unsubscribe = fcl.currentUser.subscribe(setUser)
+    return () => unsubscribe()
+  }, [])
+  
+  useEffect(() => {
+    // Get Flow balance when user is connected
+    if (user?.addr) {
+      getFlowBalance(user.addr)
+    }
+  }, [user?.addr])
+  
+  const getFlowBalance = async (address: string) => {
+    try {
+      const account = await fcl.account(address)
+      const balance = parseFloat(account.balance) / 100000000 // Convert from smallest unit
+      setFlowBalance(balance)
+    } catch (error) {
+      console.error('Error fetching Flow balance:', error)
+    }
+  }
+  
+  const login = () => fcl.authenticate()
+  const logout = () => fcl.unauthenticate()
   
   return (
     <nav className="bg-disney-darker/95 backdrop-blur-md shadow-lg sticky top-0 z-50 border-b border-gray-800">
@@ -34,30 +60,30 @@ export default function Navbar() {
           </div>
           
           <div className="flex items-center space-x-4">
-            {authenticated && (
+            {user?.addr && (
               <div className="bg-gradient-to-r from-disney-gold to-amber-400 px-4 py-2 rounded-full flex items-center space-x-2">
                 <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd"/>
+                  <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/>
+                  <path fillRule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clipRule="evenodd"/>
                 </svg>
-                <span className="text-white font-bold">${dapperBalance.toFixed(2)}</span>
+                <span className="text-white font-bold">{flowBalance.toFixed(2)} FLOW</span>
               </div>
             )}
             
-            {ready && !authenticated ? (
+            {!user?.addr ? (
               <button onClick={login} className="disney-button">
-                Sign In
+                Connect Flow Wallet
               </button>
-            ) : authenticated ? (
+            ) : (
               <div className="flex items-center space-x-4">
                 <Link href="/profile" className="text-gray-300 hover:text-disney-light-blue transition-colors">
-                  Profile
+                  {user.addr.slice(0, 6)}...{user.addr.slice(-4)}
                 </Link>
                 <button onClick={logout} className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-full transition-colors">
-                  Sign Out
+                  Disconnect
                 </button>
               </div>
-            ) : null}
+            )}
           </div>
         </div>
       </div>

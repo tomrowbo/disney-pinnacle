@@ -4,13 +4,13 @@ import Navbar from '@/components/Navbar'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { usePrivy } from '@privy-io/react-auth'
+import * as fcl from '@onflow/fcl'
 import AddToWalletButton from '@/components/AddToWalletButton'
 import CreateBadgeButton from '@/components/CreateBadgeButton'
 
 export default function Profile() {
   const router = useRouter()
-  const { ready, authenticated, user: privyUser, logout } = usePrivy()
+  const [user, setUser] = useState<any>(null)
   const [userStats, setUserStats] = useState({
     pinsCollected: 0,
     joinDate: 'July 2025'
@@ -19,13 +19,12 @@ export default function Profile() {
   const [userBadges, setUserBadges] = useState<any[]>([])
   const [badgesLoading, setBadgesLoading] = useState(false)
   
-  const getUsername = (email: string) => {
-    const username = email.split('@')[0]
-    return `@${username}`
+  const getUsername = (address: string) => {
+    return `@${address.slice(0, 6)}...${address.slice(-4)}`
   }
   
   const fetchUserBadges = async () => {
-    const walletAddress = privyUser?.wallet?.address
+    const walletAddress = user?.addr
     if (!walletAddress) return
     
     setBadgesLoading(true)
@@ -54,25 +53,31 @@ export default function Profile() {
   }
   
   useEffect(() => {
-    if (ready && !authenticated) {
-      router.push('/signup')
-    } else if (ready && authenticated) {
+    // Subscribe to Flow authentication state
+    const unsubscribe = fcl.currentUser.subscribe(setUser)
+    return () => unsubscribe()
+  }, [])
+  
+  useEffect(() => {
+    if (user?.addr) {
       fetchUserBadges()
+    } else if (user && !user.addr) {
+      router.push('/')
     }
-  }, [ready, authenticated, router, privyUser])
+  }, [user, router])
   
   const handleSignOut = () => {
-    logout()
+    fcl.unauthenticate()
     router.push('/')
   }
   
-  if (!ready || !authenticated) {
+  if (!user?.addr) {
     return (
       <>
         <Navbar />
         <main className="min-h-screen flex items-center justify-center">
           <div className="disney-card">
-            <p className="text-white">Loading...</p>
+            <p className="text-white">Please connect your Flow wallet to view your profile</p>
           </div>
         </main>
       </>
@@ -110,10 +115,9 @@ export default function Profile() {
               />
               <div className="flex-1 text-center md:text-left">
                 <h1 className="text-3xl font-bold disney-title mb-2">
-                  {privyUser?.email?.address ? getUsername(privyUser.email.address) : 
-                   privyUser?.google?.name || '@disney-fan'}
+                  {getUsername(user.addr)}
                 </h1>
-                <p className="text-gray-400 mb-4">{privyUser?.email?.address || 'Connected via Privy'}</p>
+                <p className="text-gray-400 mb-4">{user.addr}</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                   <div>
                     <p className="text-sm text-gray-400">Pins Collected</p>

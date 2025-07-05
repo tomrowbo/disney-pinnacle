@@ -82,13 +82,12 @@ const DISNEY_BADGES = [
   }
 ]
 
-// Cadence script to get onchain random number
+// Cadence script to get onchain random number using Flow's native randomness
 const GET_RANDOM_SCRIPT = `
 access(all) fun main(): UInt64 {
-    let blockHeight = getCurrentBlock().height
-    let timestamp = UInt64(getCurrentBlock().timestamp)
-    let randomSeed = blockHeight + timestamp
-    return randomSeed % 5
+    // Use Flow's native revertibleRandom() for true on-chain randomness
+    let randomValue = revertibleRandom<UInt64>()
+    return randomValue % 5
 }
 `
 
@@ -161,61 +160,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Wallet address is required' }, { status: 400 })
     }
     
-    // Validate Flow address format (8 bytes, starts with 0x)
-    let flowAddress = walletAddress
-    if (walletAddress.length > 18) {
-      // If it's an Ethereum address, we'll mint to our own account for demo
-      console.log('Received Ethereum address, minting to contract account')
-      flowAddress = ACCOUNT_ADDRESS
-    } else if (!walletAddress.startsWith('0x') || walletAddress.length !== 18) {
-      return NextResponse.json({ error: 'Invalid Flow address format' }, { status: 400 })
+    // Validate Flow address format
+    if (!walletAddress.startsWith('0x') || walletAddress.length !== 18) {
+      return NextResponse.json({ 
+        error: 'Invalid address format',
+        details: 'Provide a Flow address (0x + 16 hex chars)'
+      }, { status: 400 })
     }
+    
+    console.log(`Processing Flow address: ${walletAddress}`)
 
-    console.log('Getting onchain randomness from Flow...')
+    console.log('Badge will be randomly selected on-chain during minting...')
     
-    let randomIndex = 0
-    
-    try {
-      // Get true onchain randomness
-      const randomResult = await sdk.send([
-        sdk.script(GET_RANDOM_SCRIPT)
-      ]).then(sdk.decode)
-      
-      randomIndex = parseInt(randomResult.toString()) % 5
-      console.log('Got onchain random index:', randomIndex)
-      
-    } catch (randomError) {
-      console.log('Onchain randomness failed, using timestamp:', randomError)
-      // Fallback to timestamp-based randomness
-      randomIndex = Math.floor(Date.now() / 1000) % 5
-      console.log('Got timestamp random index:', randomIndex)
-    }
-    
-    // Select the badge based on random index
-    const selectedBadge = DISNEY_BADGES[randomIndex]
-    
-    console.log('Selected badge:', selectedBadge)
-    
-    // Create the NFT metadata
+    // NFT metadata will be determined after minting
     const nftMetadata = {
       id: `disney-pin-${walletAddress}-${Date.now()}`,
-      name: selectedBadge.name,
-      description: selectedBadge.description,
-      image: selectedBadge.image,
-      rarity: selectedBadge.rarity,
-      attributes: selectedBadge.attributes,
       recipient: walletAddress,
       mintedAt: new Date().toISOString(),
-      network: 'flow-testnet',
-      randomIndex: randomIndex
+      network: 'flow-testnet'
     }
     
-    console.log('NFT Metadata created:', nftMetadata)
+    console.log('Minting NFT with randomness determined on-chain...')
     
     // Real blockchain minting implementation
     console.log('Minting NFT on Flow blockchain...')
     
     let transactionId = null
+    let mintToUser = false
     
     try {
       // First, verify contract is deployed
@@ -233,33 +204,81 @@ export async function POST(request: NextRequest) {
       
       console.log('Contract found!', result)
       
-      // Simplified minting transaction - mint to contract account's own collection
+      // First, check if user has a collection
+      const checkCollectionScript = `
+        import DisneyPinnacleNFT from 0xbb73690b2ec0ea5a
+        import NonFungibleToken from 0x631e88ae7f1d7c20
+        
+        access(all) fun main(address: Address): Bool {
+          let account = getAccount(address)
+          return account.capabilities.borrow<&{NonFungibleToken.Collection}>(DisneyPinnacleNFT.CollectionPublicPath) != nil
+        }
+      `
+      
+      console.log('Checking if address has collection...')
+      
+      let hasCollection = false
+      try {
+        hasCollection = await sdk.send([
+          sdk.script(checkCollectionScript),
+          sdk.args([
+            sdk.arg(walletAddress, sdk.t.Address)
+          ])
+        ]).then(sdk.decode)
+        
+        console.log(`Address ${walletAddress} has collection:`, hasCollection)
+      } catch (collectionError) {
+        console.log('Collection check failed - address may not exist on Flow yet:', collectionError)
+        hasCollection = false
+      }
+      
+      // Check if user has collection - if not, require setup first
+      if (!hasCollection) {
+        console.log('User must set up collection first - no admin fallback')
+        return NextResponse.json({
+          error: 'Collection setup required',
+          requiresCollectionSetup: true,
+          instructions: 'You must set up your NFT collection before minting badges',
+          userAddress: walletAddress
+        }, { status: 400 })
+      }
+      
+      // User has collection - mint directly to them
+      console.log('User has collection - minting directly to user...')
+      mintToUser = true
+      
       const mintTransaction = `
         import DisneyPinnacleNFT from 0xbb73690b2ec0ea5a
         import NonFungibleToken from 0x631e88ae7f1d7c20
         
-        transaction() {
+        transaction(recipientAddress: Address) {
           let minter: &DisneyPinnacleNFT.NFTMinter
-          let collection: &{NonFungibleToken.Collection}
+          let recipientCollection: &{NonFungibleToken.Collection}
           
           prepare(acct: auth(BorrowValue) &Account) {
+            // Borrow the minter
             self.minter = acct.storage.borrow<&DisneyPinnacleNFT.NFTMinter>(from: DisneyPinnacleNFT.MinterStoragePath)
               ?? panic("Could not borrow minter reference")
-              
-            self.collection = acct.storage.borrow<&{NonFungibleToken.Collection}>(from: DisneyPinnacleNFT.CollectionStoragePath)
-              ?? panic("Could not borrow collection")
+            
+            // Get recipient's collection
+            let recipient = getAccount(recipientAddress)
+            self.recipientCollection = recipient.capabilities.borrow<&{NonFungibleToken.Collection}>(DisneyPinnacleNFT.CollectionPublicPath)
+              ?? panic("Could not borrow recipient collection")
           }
           
           execute {
             let badgeType = DisneyPinnacleNFT.getRandomBadgeType()
-            self.minter.mintNFT(recipient: self.collection, badgeType: badgeType)
+            self.minter.mintNFT(recipient: self.recipientCollection, badgeType: badgeType)
           }
         }
       `
       
-      // Execute transaction using SDK - set all roles but use the same account
+      // Execute transaction using SDK
+      const args = mintToUser ? [sdk.arg(walletAddress, sdk.t.Address)] : []
+      
       transactionId = await sdk.send([
         sdk.transaction(mintTransaction),
+        sdk.args(args),
         sdk.proposer(authz),
         sdk.authorizations([authz]),
         sdk.payer(authz),
@@ -278,12 +297,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       transactionId: transactionId,
-      badge: selectedBadge,
       metadata: nftMetadata,
-      message: `Successfully minted ${selectedBadge.name} badge for ${walletAddress}!`,
+      message: 'Successfully minted random Disney badge to your wallet!',
       isSimulated: false,
       blockchainStatus: 'Successfully minted on Flow testnet',
-      explorerUrl: transactionId ? `https://testnet.flowscan.io/tx/${transactionId}` : null
+      explorerUrl: transactionId ? `https://testnet.flowscan.io/tx/${transactionId}` : null,
+      userAddress: walletAddress,
+      note: 'Badge details will appear in your profile once transaction is confirmed'
     })
     
   } catch (error) {
