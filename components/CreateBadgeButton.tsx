@@ -157,13 +157,22 @@ export default function CreateBadgeButton({ onBadgeCreated }: CreateBadgeButtonP
 
       const data = await response.json()
       
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create badge')
-      }
-
       console.log('Minting response:', data)
       
-      // Handle Flow wallet response
+      // Handle error responses (like collection setup required)
+      if (!response.ok) {
+        // Still show the response data for error states like collection setup
+        setLastResponse(data)
+        setLastBadge(null)
+        
+        // Don't throw error for collection setup - let UI handle it
+        if (!data.requiresCollectionSetup) {
+          throw new Error(data.error || 'Failed to create badge')
+        }
+        return
+      }
+      
+      // Handle successful responses
       if (data.badge) {
         setLastBadge(data.badge)
       } else {
@@ -171,11 +180,6 @@ export default function CreateBadgeButton({ onBadgeCreated }: CreateBadgeButtonP
         setLastBadge(null)
       }
       setLastResponse(data)
-      
-      // If user needs collection setup, show instructions
-      if (data.requiresCollectionSetup) {
-        console.log('User needs to set up collection to receive NFT')
-      }
       
       // Notify parent component to refresh badges
       if (onBadgeCreated) {
