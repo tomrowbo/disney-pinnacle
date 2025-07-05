@@ -128,7 +128,7 @@ const verifyKey = () => {
 }
 
 // Authorization using the account resolver pattern - ORIGINAL WORKING VERSION
-const authz = async (account: any = {}) => {
+const authz: any = async (account: any = {}) => {
   const user = await sdk.account(ACCOUNT_ADDRESS)
   const key = user.keys[KEY_INDEX]
   
@@ -273,9 +273,8 @@ export async function POST(request: NextRequest) {
         }
       `
       
-      // Execute transaction using SDK - await auth
+      // Execute transaction using SDK - pass authz function directly
       const args = mintToUser ? [sdk.arg(walletAddress, sdk.t.Address)] : []
-      // const auth = await authz()
       
       transactionId = await sdk.send([
         sdk.transaction(mintTransaction),
