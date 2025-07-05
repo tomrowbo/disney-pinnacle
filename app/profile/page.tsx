@@ -169,7 +169,7 @@ export default function Profile() {
                       </span>
                       <div className="text-xs text-gray-500 mt-2">
                         <p>Token ID: {badge.tokenId}</p>
-                        <p>Minted: {new Date(badge.mintedAt).toLocaleDateString()}</p>
+                        <p>Minted: {new Date(badge.mintedAt).toLocaleString()}</p>
                       </div>
                     </div>
                   ))}

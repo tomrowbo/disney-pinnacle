@@ -45,7 +45,7 @@ const getUserBadges = async (walletAddress: string) => {
       
       for (const id of nftData) {
         try {
-          // Script to get individual NFT metadata
+          // Script to get individual NFT metadata including mint timestamp
           const getNFTMetadataScript = `
             import DisneyPinnacleNFT from 0xbb73690b2ec0ea5a
             import NonFungibleToken from 0x631e88ae7f1d7c20
@@ -60,7 +60,8 @@ const getUserBadges = async (walletAddress: string) => {
                     "name": nft.name,
                     "description": nft.description,
                     "thumbnail": nft.thumbnail,
-                    "badgeType": nft.badgeType.rawValue.toString()
+                    "badgeType": nft.badgeType.rawValue.toString(),
+                    "mintedAt": nft.mintedAt.toString()
                   }
                 }
               }
@@ -95,7 +96,7 @@ const getUserBadges = async (walletAddress: string) => {
                 series: 'Disney Collection',
                 year: '2025'
               },
-              mintedAt: new Date().toISOString(),
+              mintedAt: metadata.mintedAt ? new Date(parseFloat(metadata.mintedAt) * 1000).toISOString() : new Date().toISOString(),
               transactionId: `flow-nft-${metadata.id}`,
               isBlockchainData: true
             })
