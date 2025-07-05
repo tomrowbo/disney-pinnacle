@@ -46,8 +46,14 @@ export default function AddToWalletButton() {
       
       console.log('Pass response:', data)
       
-      // Open the pass URL in a new window/tab
-      window.open(data.passUrl, '_blank')
+      // For iOS/mobile, navigate directly to the pass URL
+      // This works better than window.open which often gets blocked
+      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        window.location.href = data.passUrl
+      } else {
+        // Desktop - open in new tab
+        window.open(data.passUrl, '_blank')
+      }
       
     } catch (error) {
       console.error('Error creating pass:', error)
@@ -74,6 +80,19 @@ export default function AddToWalletButton() {
         )}
       </button>
 
+      {passUrl && (
+        <div className="mt-4 p-3 bg-green-600 text-green-100 rounded-lg">
+          <p className="text-sm mb-2">✅ Pass created successfully!</p>
+          <a 
+            href={passUrl} 
+            className="text-white underline hover:text-green-200"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Open Pass in Wallet
+          </a>
+        </div>
+      )}
     </div>
   )
 }

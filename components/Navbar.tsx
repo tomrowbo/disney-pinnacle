@@ -5,7 +5,6 @@ import { useState, useEffect } from 'react'
 import * as fcl from '@onflow/fcl'
 
 export default function Navbar() {
-  const [flowBalance, setFlowBalance] = useState(0.00)
   const [user, setUser] = useState<any>(null)
   
   useEffect(() => {
@@ -13,23 +12,7 @@ export default function Navbar() {
     const unsubscribe = fcl.currentUser.subscribe(setUser)
     return () => unsubscribe()
   }, [])
-  
-  useEffect(() => {
-    // Get Flow balance when user is connected
-    if (user?.addr) {
-      getFlowBalance(user.addr)
-    }
-  }, [user?.addr])
-  
-  const getFlowBalance = async (address: string) => {
-    try {
-      const account = await fcl.account(address)
-      const balance = parseFloat(String(account.balance)) / 100000000 // Convert from smallest unit
-      setFlowBalance(balance)
-    } catch (error) {
-      console.error('Error fetching Flow balance:', error)
-    }
-  }
+
   
   const login = () => fcl.authenticate()
   const logout = () => fcl.unauthenticate()
@@ -59,17 +42,7 @@ export default function Navbar() {
             </Link>
           </div>
           
-          <div className="flex items-center space-x-4">
-            {user?.addr && (
-              <div className="bg-gradient-to-r from-disney-gold to-amber-400 px-4 py-2 rounded-full flex items-center space-x-2">
-                <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/>
-                  <path fillRule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clipRule="evenodd"/>
-                </svg>
-                <span className="text-white font-bold">{flowBalance.toFixed(2)} FLOW</span>
-              </div>
-            )}
-            
+          <div className="flex items-center space-x-4">     
             {!user?.addr ? (
               <button onClick={login} className="disney-button">
                 Connect Flow Wallet
